@@ -1,6 +1,7 @@
 # OS / editor
 .DS_Store
 Thumbs.db
+Desktop.ini
 .idea/
 .vscode/
 *.swp
@@ -14,44 +15,54 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# Dependencies and frontend build outputs
+# Dependencies
 node_modules/
-frontend/build/
-frontend/dist/
-frontend/.cache/
-frontend/.parcel-cache/
-frontend/.turbo/
-frontend/.next/
-frontend/coverage/
+bower_components/
+package-lock.json.tmp
 
-# Backend Python artifacts
-backend/__pycache__/
-backend/**/*.py[cod]
-backend/.pytest_cache/
-backend/.mypy_cache/
-backend/.ruff_cache/
-backend/.coverage
-backend/htmlcov/
-backend/.venv/
-backend/venv/
-backend/env/
+# Frontend build outputs
+build/
+dist/
+out/
+.parcel-cache/
+.turbo/
+.next/
+.nuxt/
+.svelte-kit/
+coverage/
+
+# Python artifacts / virtualenvs
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.venv/
+venv/
+env/
 
 # Generic caches / temp files
 .cache/
 .tmp/
 tmp/
 temp/
+*.pid
+*.seed
 
 # Environment files
 .env
 .env.*
 !.env.example
 
-# Runtime data
-*.pid
-*.seed
-
-# Local databases and generated binaries
-backend/*.db
+# Local databases and generated data
+*.db
 *.sqlite
 *.sqlite3
+backend/data/
