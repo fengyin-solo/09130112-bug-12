@@ -17,6 +17,7 @@ interface ViewerState {
   showGrid: boolean;
   zoom: number;
   rotation: [number, number, number];
+  viewResetToken: number;
 }
 
 const initialState: ViewerState = {
@@ -64,6 +65,7 @@ const initialState: ViewerState = {
   showGrid: true,
   zoom: 1,
   rotation: [0, 0, 0],
+  viewResetToken: 0,
 };
 
 const viewerSlice = createSlice({
@@ -117,16 +119,19 @@ const viewerSlice = createSlice({
     setTool: (state, action: PayloadAction<ViewerState['tool']>) => {
       state.tool = action.payload;
       state.measurementPoints = [];
+      state.lastMeasurement = null;
     },
     setMeasurementType: (state, action: PayloadAction<ViewerState['measurementType']>) => {
       state.measurementType = action.payload;
       state.measurementPoints = [];
+      state.lastMeasurement = null;
     },
     addMeasurementPoint: (state, action: PayloadAction<Point3D>) => {
       state.measurementPoints.push(action.payload);
     },
     clearMeasurementPoints: (state) => {
       state.measurementPoints = [];
+      state.lastMeasurement = null;
     },
     setLastMeasurement: (state, action: PayloadAction<MeasurementResult | null>) => {
       state.lastMeasurement = action.payload;
@@ -146,7 +151,10 @@ const viewerSlice = createSlice({
     setRotation: (state, action: PayloadAction<[number, number, number]>) => {
       state.rotation = action.payload;
     },
-    resetViewer: () => initialState,
+    resetViewer: (state) => ({
+      ...initialState,
+      viewResetToken: state.viewResetToken + 1,
+    }),
   },
 });
 

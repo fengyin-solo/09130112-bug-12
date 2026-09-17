@@ -49,7 +49,7 @@ const Raycaster: React.FC<{
   seismicData: SeismicData;
   onPointClick: (point: THREE.Vector3) => void;
 }> = ({ seismicData, onPointClick }) => {
-  const { raycaster, mouse, camera } = useThree();
+  const { raycaster, camera, gl } = useThree();
   const tool = useSelector((state: RootState) => state.viewer.tool);
   const planeRef = useRef<THREE.Mesh>(null);
 
@@ -58,12 +58,28 @@ const Raycaster: React.FC<{
   const depth = (seismicData.num_inlines || 100) * 10;
 
   useEffect(() => {
+    const canvas = gl.domElement;
+    const mouse = new THREE.Vector2();
+    let pointerDown: { x: number; y: number } | null = null;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      pointerDown = { x: event.clientX, y: event.clientY };
+    };
+
     const handleClick = (event: MouseEvent) => {
       if (tool !== 'measure' || !planeRef.current) return;
 
-      const rect = (event.target as HTMLCanvasElement).getBoundingClientRect();
-      mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-      mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+      // 拖动（如旋转视角）不视为选点
+      if (pointerDown) {
+        const moved = Math.hypot(event.clientX - pointerDown.x, event.clientY - pointerDown.y);
+        if (moved > 4) return;
+      }
+
+      const rect = canvas.getBoundingClientRect();
+      mouse.set(
+        ((event.clientX - rect.left) / rect.width) * 2 - 1,
+        -((event.clientY - rect.top) / rect.height) * 2 + 1
+      );
 
       raycaster.setFromCamera(mouse, camera);
       const intersects = raycaster.intersectObject(planeRef.current);
@@ -73,9 +89,13 @@ const Raycaster: React.FC<{
       }
     };
 
-    window.addEventListener('click', handleClick);
-    return () => window.removeEventListener('click', handleClick);
-  }, [raycaster, mouse, camera, tool, onPointClick]);
+    canvas.addEventListener('pointerdown', handlePointerDown);
+    canvas.addEventListener('click', handleClick);
+    return () => {
+      canvas.removeEventListener('pointerdown', handlePointerDown);
+      canvas.removeEventListener('click', handleClick);
+    };
+  }, [raycaster, camera, gl, tool, onPointClick]);
 
   return (
     <mesh ref={planeRef} position={[0, 0, 0]} visible={false}>
@@ -152,6 +172,25 @@ const SeismicCanvas: React.FC<SeismicCanvasProps> = ({ seismicData, containerRef
   const depth = (seismicData.num_inlines || 100) * 10;
   const maxDim = Math.max(width, height, depth);
 
+  const controlsRef = useRef<React.ElementRef<typeof OrbitControls> | null>(null);
+  const viewResetToken = useSelector((state: RootState) => state.viewer.viewResetToken);
+  const isFirstReset = useRef(true);
+
+  useEffect(() => {
+    if (isFirstReset.current) {
+      isFirstReset.current = false;
+      return;
+    }
+    const controls = controlsRef.current;
+    if (!controls) return;
+    const camera = controls.object as THREE.PerspectiveCamera;
+    camera.position.set(maxDim * 1.5, maxDim * 0.8, maxDim * 1.5);
+    camera.zoom = 1;
+    camera.updateProjectionMatrix();
+    controls.target.set(0, 0, 0);
+    controls.update();
+  }, [viewResetToken, maxDim]);
+
   return (
     <Canvas
       style={{ width: '100%', height: '100%' }}
@@ -166,6 +205,7 @@ const SeismicCanvas: React.FC<SeismicCanvasProps> = ({ seismicData, containerRef
         far={maxDim * 10}
       />
       <OrbitControls
+        ref={controlsRef}
         enableDamping
         dampingFactor={0.05}
         minDistance={maxDim * 0.1}
