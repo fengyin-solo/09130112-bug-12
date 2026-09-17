@@ -49,19 +49,20 @@ const Raycaster: React.FC<{
   seismicData: SeismicData;
   onPointClick: (point: THREE.Vector3) => void;
 }> = ({ seismicData, onPointClick }) => {
-  const { raycaster, mouse, camera } = useThree();
+  const { raycaster, mouse, camera, gl } = useThree();
   const tool = useSelector((state: RootState) => state.viewer.tool);
   const planeRef = useRef<THREE.Mesh>(null);
 
   const width = (seismicData.num_crosslines || 100) * 10;
   const height = (seismicData.num_depths || 100) * 10;
-  const depth = (seismicData.num_inlines || 100) * 10;
 
   useEffect(() => {
+    const domElement = gl.domElement;
+
     const handleClick = (event: MouseEvent) => {
       if (tool !== 'measure' || !planeRef.current) return;
 
-      const rect = (event.target as HTMLCanvasElement).getBoundingClientRect();
+      const rect = domElement.getBoundingClientRect();
       mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
       mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
@@ -73,9 +74,9 @@ const Raycaster: React.FC<{
       }
     };
 
-    window.addEventListener('click', handleClick);
-    return () => window.removeEventListener('click', handleClick);
-  }, [raycaster, mouse, camera, tool, onPointClick]);
+    domElement.addEventListener('click', handleClick);
+    return () => domElement.removeEventListener('click', handleClick);
+  }, [gl, raycaster, mouse, camera, tool, onPointClick]);
 
   return (
     <mesh ref={planeRef} position={[0, 0, 0]} visible={false}>
@@ -83,6 +84,30 @@ const Raycaster: React.FC<{
       <meshBasicMaterial transparent opacity={0} />
     </mesh>
   );
+};
+
+type OrbitControlsLike = {
+  target: THREE.Vector3;
+  update: () => void;
+};
+
+const CameraResetter: React.FC<{ initialPosition: [number, number, number] }> = ({
+  initialPosition,
+}) => {
+  const camera = useThree((state) => state.camera);
+  const controls = useThree((state) => state.controls) as OrbitControlsLike | null;
+  const resetNonce = useSelector((state: RootState) => state.viewer.viewResetNonce);
+
+  useEffect(() => {
+    if (resetNonce === 0) return;
+    camera.position.set(...initialPosition);
+    if (controls) {
+      controls.target.set(0, 0, 0);
+      controls.update();
+    }
+  }, [resetNonce, camera, controls, initialPosition]);
+
+  return null;
 };
 
 const SeismicScene: React.FC<{ seismicData: SeismicData }> = ({ seismicData }) => {
@@ -166,10 +191,14 @@ const SeismicCanvas: React.FC<SeismicCanvasProps> = ({ seismicData, containerRef
         far={maxDim * 10}
       />
       <OrbitControls
+        makeDefault
         enableDamping
         dampingFactor={0.05}
         minDistance={maxDim * 0.1}
         maxDistance={maxDim * 5}
+      />
+      <CameraResetter
+        initialPosition={[maxDim * 1.5, maxDim * 0.8, maxDim * 1.5]}
       />
       <SceneSetup seismicData={seismicData} />
       <SeismicScene seismicData={seismicData} />

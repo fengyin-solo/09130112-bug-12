@@ -1,39 +1,56 @@
-import React from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { useSelector } from 'react-redux';
+import { Line } from '@react-three/drei';
 import * as THREE from 'three';
 import { RootState } from '../store';
+
+const PointLabel: React.FC<{ text: string; position: [number, number, number] }> = ({
+  text,
+  position,
+}) => {
+  const texture = useMemo(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 32;
+    const ctx = canvas.getContext('2d')!;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(0, 0, 128, 32);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '12px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, 64, 16);
+    return new THREE.CanvasTexture(canvas);
+  }, [text]);
+
+  useEffect(() => {
+    return () => texture.dispose();
+  }, [texture]);
+
+  return (
+    <sprite position={position}>
+      <spriteMaterial map={texture} transparent depthTest={false} />
+    </sprite>
+  );
+};
 
 const MeasurementOverlay: React.FC = () => {
   const measurementPoints = useSelector((state: RootState) => state.viewer.measurementPoints);
   const lastMeasurement = useSelector((state: RootState) => state.viewer.lastMeasurement);
   const tool = useSelector((state: RootState) => state.viewer.tool);
 
-  if (tool !== 'measure') return null;
+  // 非测量工具不渲染任何对象；所有 hooks 都在此判断之前调用，保证切换工具时组件可正常卸载清理。
+  if (tool !== 'measure' || measurementPoints.length === 0) return null;
 
-  const pointsGeometry = React.useMemo(() => {
-    const positions = new Float32Array(measurementPoints.length * 3);
-    measurementPoints.forEach((p, i) => {
-      positions[i * 3] = p.x;
-      positions[i * 3 + 1] = p.y;
-      positions[i * 3 + 2] = p.z;
-    });
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    return geometry;
-  }, [measurementPoints]);
+  const linePoints = measurementPoints.map(
+    (p): [number, number, number] => [p.x, p.y, p.z]
+  );
 
-  const lineGeometry = React.useMemo(() => {
-    if (measurementPoints.length < 2) return null;
-    const positions = new Float32Array(measurementPoints.length * 3);
-    measurementPoints.forEach((p, i) => {
-      positions[i * 3] = p.x;
-      positions[i * 3 + 1] = p.y;
-      positions[i * 3 + 2] = p.z;
-    });
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    return geometry;
-  }, [measurementPoints]);
+  const lastPoint = measurementPoints[measurementPoints.length - 1];
+  const labelText =
+    lastMeasurement && measurementPoints.length >= 2
+      ? `${lastMeasurement.value.toFixed(2)} ${lastMeasurement.unit}`
+      : `点 ${measurementPoints.length}`;
 
   return (
     <group>
@@ -44,42 +61,14 @@ const MeasurementOverlay: React.FC = () => {
         </mesh>
       ))}
 
-      {lineGeometry && (
-        <lineSegments geometry={lineGeometry}>
-          <lineBasicMaterial color="#ff4d4f" linewidth={2} />
-        </lineSegments>
+      {measurementPoints.length >= 2 && (
+        <Line points={linePoints} color="#ff4d4f" lineWidth={2} />
       )}
 
-      {measurementPoints.length > 0 && (
-        <sprite position={[
-          measurementPoints[measurementPoints.length - 1].x,
-          measurementPoints[measurementPoints.length - 1].y + 5,
-          measurementPoints[measurementPoints.length - 1].z
-        ]}>
-          <spriteMaterial>
-            <canvasTexture
-              image={(function createLabel() {
-                const canvas = document.createElement('canvas');
-                canvas.width = 128;
-                canvas.height = 32;
-                const ctx = canvas.getContext('2d')!;
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-                ctx.fillRect(0, 0, 128, 32);
-                ctx.fillStyle = '#ffffff';
-                ctx.font = '12px Arial';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                if (lastMeasurement && measurementPoints.length >= 2) {
-                  ctx.fillText(`${lastMeasurement.value.toFixed(2)} ${lastMeasurement.unit}`, 64, 16);
-                } else {
-                  ctx.fillText(`点 ${measurementPoints.length}`, 64, 16);
-                }
-                return canvas;
-              })()}
-            />
-          </spriteMaterial>
-        </sprite>
-      )}
+      <PointLabel
+        text={labelText}
+        position={[lastPoint.x, lastPoint.y + 5, lastPoint.z]}
+      />
     </group>
   );
 };
